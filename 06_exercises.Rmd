@@ -12,7 +12,7 @@ output:
 
 
 ```{r setup, include=FALSE}
-#knitr::opts_chunk$set(echo = TRUE, error=TRUE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo = TRUE, error=TRUE, message=FALSE, warning=FALSE)
 ```
 
 ```{r libraries}
@@ -20,16 +20,6 @@ library(tidyverse)     # for data cleaning and plotting
 library(gardenR)       # for Lisa's garden data
 library(lubridate)     # for date manipulation
 library(openintro)     # for the abbr2state() function
-library(gplots)        # for col2hex() function
-library(RColorBrewer)  # for color palettes
-library(sf)            # for working with spatial data
-library(leaflet)       # for highly customizable mapping
-library(ggthemes)      # for more themes (including theme_map())
-library(plotly)        # for the ggplotly() - basic interactivity
-library(gganimate)     # for adding animation layers to ggplots
-library(gifski)        # for creating the gif (don't need to load this library every time,but need it installed)
-library(transformr)    # for "tweening" (gganimate)
-library(shiny)         # for creating interactive apps
 library(patchwork)     # for nicely combining ggplot2 graphs  
 library(gt)            # for creating nice tables
 library(rvest)         # for scraping data
@@ -102,6 +92,8 @@ Groceries_dataset %>%
 ```{r}
 vgsales_dataset <- read_csv("vgsales.csv")
 
+vgsales_dataset
+
 vgsales_table <- gt(vgsales_dataset)
   
 vgsales_table %>% 
@@ -123,31 +115,40 @@ vgsales_table %>%
 ```
 
 4. CHALLENGE (not graded): Write code to replicate the table shown below (open the .html file to see it) created from the `garden_harvest` data asvgs best as you can. When you get to coloring the cells, I used the following line of code for the `colors` argument:
-  
-```{r, eval=FALSE}
-colors = scales::col_numeric(
-      palette = paletteer::paletteer_d(
-        palette = "RColorBrewer::YlGn"
-      ) %>% as.character()
-```
-
-![](garden_table.html){width=600, height=1000}
 
   
 5. Use `patchwork` operators and functions to combine at least two graphs using your project data or `garden_harvest` data if your project data aren't read.
 
-```{r}
-vgsales_dataset %>% 
-  filter(Genre == )
+```{r, fig.alt = "Column chart showing the total global sales based off of Genre and Platform." }
+vg_genre <- vgsales_dataset %>% 
+  group_by(Genre) %>% 
+  summarize(total_sales = sum(Global_Sales)) %>% 
+  filter(total_sales > 0)
 
-P1 <- ggplot(data = vgsales_dataset,
-             aes(x = Global_Sales, y = Platform)) + geom_col()+
-  labs(title = )
+vg_platform <- vgsales_dataset %>% 
+  group_by(Platform) %>% 
+  summarize(total_sales = sum(Global_Sales)) %>% 
+  filter(total_sales > 2)
 
-P2 <- ggplot(data = vgsales_dataset,
-             aes(x = Global_Sales, y = Genre)) + geom_col()
+P1 <- ggplot(data = vg_platform,
+             aes(x = total_sales, 
+                 y = Platform)) + 
+  geom_col() +
+  labs(x = "Sales (Millions)",
+       y = "",
+       title = "Total Global Sales by Platform" )
 
-P1+P2
+P2 <- ggplot(data = vg_genre,
+             aes(x = total_sales, 
+                 y = Genre)) + 
+  geom_col() +
+  labs(x = "Sales (Millions)",
+       y = "",
+       title = "Total Global Sales by Genre")
+
+P3 <- P1+P2
+
+P3
   
 ```
 
@@ -156,8 +157,7 @@ P1+P2
 
 Use the data from the [Macalester Registrar's Fall 2017 Class Schedule](https://www.macalester.edu/registrar/schedules/2017fall/class-schedule/#crs10008) to complete all these exercises.
 
-6. Find the correct selectors for the following fields. Make sure that each matches 762 results:
-
+6. Find the correct selectors for the following fields. Make sure that each matches 762 results: 
   * Course Number
   * Course Name
   * Day
@@ -169,10 +169,98 @@ Use the data from the [Macalester Registrar's Fall 2017 Class Schedule](https://
   * Description
 
 Then, put all this information into one dataset (tibble or data.frame) Do not include any extraneous information like "Instructor: ".
+
+```{r}
+fall2017 <- read_html("https://www.macalester.edu/registrar/schedules/2017fall/class-schedule/#crs10008")
+
+course_nums  <- 
+  fall2017 %>%
+  html_elements(".class-schedule-course-number") %>%
+  html_text2()
+
+course_names <- 
+  fall2017 %>%
+  html_elements(".class-schedule-course-title") %>%
+  html_text2()
+
+course_day <-
+  fall2017 %>% 
+  html_elements(".class-schedule-course-title+ .class-schedule-label") %>% 
+  html_text2() %>% 
+  str_sub(start = 7)
+
+course_time <- 
+  fall2017 %>% 
+  html_elements("td.class-schedule-label:nth-child(4)") %>% 
+  html_text2() %>% 
+  str_sub(start = 7)
+
+course_room <- 
+  fall2017 %>%
+  html_elements("td.class-schedule-label:nth-child(5)") %>% 
+  html_text2() %>% 
+  str_sub(start = 7)
+
+course_instructor <- 
+  fall2017 %>% 
+  html_elements("td.class-schedule-label:nth-child(6)") %>% 
+  html_text2() %>% 
+  str_sub(start = 13)
+
+course_avail_max <-
+  fall2017 %>%
+  html_elements("td.class-schedule-label:nth-child(7)") %>% 
+  html_text2() %>% 
+  str_sub(start = 14)
+
+course_gen_ed_req <-
+  fall2017 %>%
+  html_elements(".collapsed p:nth-child(2)") %>% 
+  html_text2() %>% 
+  str_sub(start = 35)
+
+course_descript <-
+  fall2017 %>%
+  html_elements(".collapsed p:nth-child(1)") %>% 
+  html_text2() %>% 
+  str_sub(start = 3)
+
+fall2017class_schedule <- data.frame(
+  CourseNumber = course_nums,
+  CourseName = course_names,
+  CourseDay = course_day,
+  CourseTime = course_time,
+  CourseRoom = course_room,
+  CourseInstructor = course_instructor,
+  CourseAvailibility = course_avail_max,
+  CourseGenEdReq = course_gen_ed_req,
+  CourseDescription = course_descript)
+fall2017class_schedule
   
+```
+
 
 7. Create a graph that shows the number of sections offered per department. Hint: The department is a substring of the course number - there are `str_XXX()` functions that can help. Yes, COMP and MATH are the same department, but for this exercise you can just show the results by four letter department code, e.g., with COMP and MATH separate.
 
+```{r, fig.height=10, fig.width=10, fig.alt = "Column chart that shows the number of sections offerred in each department where the department HISP had the most sections."}
+fall2017class_schedule %>% 
+  mutate(CourseDepartment = ifelse(str_sub(CourseNumber, end = 3) == "ART",
+                                   str_sub(CourseNumber, end = 4),
+                                   str_sub(CourseNumber, end = 4))) %>%
+  mutate(CourseDepartment = ifelse(str_sub(CourseNumber, end = 2) == "PE",
+                                   str_sub(CourseNumber, end = 3),
+                                   str_sub(CourseNumber, end = 4))) %>%
+  group_by(CourseDepartment) %>% 
+  count() %>% 
+  ggplot(aes(x = n, 
+             y = CourseDepartment, 
+             fill = CourseDepartment))+
+  geom_col() +
+  labs(x = "", 
+       y = "", 
+       title = "Number of Sections offered for each Department") +
+  theme(legend.position = 'none')
+```
 
 8. Analyze the typical length of course names by department. To do so, create a new data table based on your courses data table, with the following changes:
   
@@ -180,6 +268,37 @@ Then, put all this information into one dataset (tibble or data.frame) Do not in
   * Remove departments that have fewer than 10 sections of courses. To do so, group by department, then remove observations in groups with fewer than 10 sections (Hint: use filter with n()). Then `ungroup()` the data.  
   * Create a visualization of the differences across groups in lengths of course names or course descriptions. Think carefully about the visualization you should be using!
 
+```{r, fig.height = 10, fig.width = 10, fig.alt = "Column chart that shows the average length of course names for each department where the department INTL has the most length of course names."}
+courselength <- data.frame(
+  CourseNumber = course_nums,
+  CourseName = course_names,
+  CourseDay = course_day,
+  CourseTime = course_time,
+  CourseAvailability = course_avail_max,
+  CourseGenEdReq = course_gen_ed_req,
+  CourseDescription = course_descript,
+  NameLength = str_length(course_names),
+  DescriptionLength = str_length(course_descript))
+
+courselength %>% 
+  mutate(CourseDepartment = ifelse(str_sub(CourseNumber, end = 2) == "PE",
+                                   str_sub(CourseNumber, end = 3),
+                                   str_sub(CourseNumber,end = 4))) %>% 
+  group_by(CourseDepartment) %>% 
+  filter(n() >= 10) %>% 
+  ungroup()%>%
+  group_by(CourseDepartment) %>% 
+  summarise(avg_length = sum(NameLength)/n()) %>% 
+  ggplot(aes(x = avg_length,
+             y = CourseDepartment, 
+             fill = CourseDepartment))+
+  geom_col()+
+  labs(x = "",
+       y = "", 
+       title = "Average Length of Course Name for each Department")+
+  theme(legend.position = 'none')
+  
+```
 
   
 
